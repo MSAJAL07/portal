@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# sajalmishra.com
+
+Personal portfolio site for [Sajal Kumar Mishra](https://www.linkedin.com/in/sajal-kumar-mishra/) — Senior Software Developer.
+
+Built with Next.js 16, statically exported, and deployable to S3/CloudFront.
+
+---
+
+## Tech Stack
+
+- **Framework** — Next.js 16 (App Router, TypeScript)
+- **Styling** — Tailwind CSS v4
+- **Components** — shadcn/ui (base-ui variant)
+- **Animations** — Framer Motion
+- **Theme** — next-themes (dark by default, light/dark toggle)
+- **Blog** — MDX via next-mdx-remote + gray-matter
+- **Icons** — lucide-react + custom brand SVGs
+- **Fonts** — Inter + JetBrains Mono (via `next/font/google`)
+- **Output** — Static export (`out/`) for S3/CloudFront deployment
+
+---
+
+## Project Structure
+
+```
+src/
+  app/                    # Routes (App Router)
+  components/
+    layout/               # Navbar, Footer
+    sections/             # Hero, About, Experience, Skills, cards, ContactForm
+    ui/                   # shadcn components
+    icons.tsx             # Brand SVGs (GitHub, LinkedIn, X)
+    ThemeToggle.tsx
+  config/
+    site.ts               # Name, email, social URLs — edit this first
+  data/
+    projects.ts           # Project list — add new projects here
+    skills.ts             # Skill categories — add new skills here
+  lib/
+    mdx.ts                # Blog post utilities
+content/
+  blog/                   # Drop .mdx files here to publish posts
+```
+
+---
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+```bash
+npm run dev        # Development server
+npm run build      # Static export → out/
+npx serve out      # Preview the exported site locally
+npm run lint       # ESLint
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Adding Content
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### New project
 
-## Deploy on Vercel
+Edit [`src/data/projects.ts`](src/data/projects.ts) and add an entry to the `projects` array:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```ts
+{
+  id: "my-project",
+  title: "My Project",
+  description: "What it does.",
+  tags: ["React", "TypeScript"],
+  liveUrl: "https://my-project.sajalmishra.com",
+  githubUrl: "https://github.com/MSAJAL07/my-project",
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### New blog post
+
+Create a file in `content/blog/my-post.mdx`:
+
+```mdx
+---
+title: "Post Title"
+date: "2026-05-15"
+description: "One sentence summary."
+tags: ["tag"]
+---
+
+Post content here...
+```
+
+It will appear at `/blog/my-post` automatically — no code changes needed.
+
+### New skill
+
+Edit [`src/data/skills.ts`](src/data/skills.ts) and add to an existing category or create a new one.
+
+### Site metadata
+
+All name, URL, and social links live in [`src/config/site.ts`](src/config/site.ts). Update `url` before deploying.
+
+---
+
+## Deployment
+
+The build produces a fully static `out/` directory. Planned deployment: **AWS S3 + CloudFront**.
+
+```bash
+npm run build   # generates out/
+# then sync out/ to your S3 bucket
+```
+
+The contact form currently logs to the console — wire up a backend (API Gateway, Resend, etc.) in `src/components/sections/ContactForm.tsx` when ready.
+
+---
+
+## Links
+
+- GitHub: [github.com/MSAJAL07](https://github.com/MSAJAL07)
+- LinkedIn: [linkedin.com/in/sajal-kumar-mishra](https://www.linkedin.com/in/sajal-kumar-mishra/)
+- Twitter/X: [@msajaldev](https://twitter.com/msajaldev)
