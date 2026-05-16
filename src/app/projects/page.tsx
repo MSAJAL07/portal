@@ -14,8 +14,9 @@ export default function ProjectsPage() {
       >
         <h1 className="text-3xl font-bold mb-2">Projects</h1>
         <p className="text-muted-foreground mb-10">
-          A selection of things I&apos;ve built. Add new ones by editing{" "}
-          <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">src/data/projects.ts</code>.
+          A selection of things I&apos;ve built.
+           {/* Add new ones by editing{" "}
+          <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">src/data/projects.ts</code>. */}
         </p>
       </motion.div>
 
