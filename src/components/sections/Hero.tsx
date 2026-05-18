@@ -121,7 +121,7 @@ export function Hero() {
           >
             <div className="relative w-56 h-56 sm:w-72 sm:h-72 rounded-full overflow-hidden ring-2 ring-border">
               <Image
-                src="https://avatars.githubusercontent.com/u/45098416?v=4"
+                src="/avatar.jpg"
                 alt="Sajal Kumar Mishra"
                 fill
                 className="object-cover"
