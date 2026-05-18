@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Hero } from "@/components/sections/Hero";
@@ -9,6 +10,14 @@ import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { projects } from "@/data/projects";
+import { siteConfig } from "@/config/site";
+
+export const metadata: Metadata = {
+  title: siteConfig.title,
+  description: siteConfig.description,
+  alternates: { canonical: "/" },
+  openGraph: { url: siteConfig.url },
+};
 
 export default function Home() {
   const featured = projects.slice(0, 3);

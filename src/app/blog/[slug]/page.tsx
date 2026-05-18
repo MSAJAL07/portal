@@ -1,13 +1,45 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { Badge } from "@/components/ui/badge";
 import { getAllPosts, getPostBySlug } from "@/lib/mdx";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { siteConfig } from "@/config/site";
 
 export async function generateStaticParams() {
   const posts = getAllPosts();
   return posts.map((post) => ({ slug: post.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const post = getPostBySlug(slug);
+  if (!post) return {};
+
+  return {
+    title: post.title,
+    description: post.description,
+    alternates: { canonical: `/blog/${slug}/` },
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description: post.description,
+      url: `${siteConfig.url}/blog/${slug}/`,
+      publishedTime: post.date,
+      authors: [siteConfig.name],
+      tags: post.tags,
+    },
+    twitter: {
+      card: "summary",
+      title: post.title,
+      description: post.description,
+    },
+  };
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {

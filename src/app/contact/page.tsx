@@ -1,8 +1,20 @@
+import type { Metadata } from "next";
 import { ContactForm } from "@/components/sections/ContactForm";
 import { siteConfig } from "@/config/site";
 import { Mail } from "lucide-react";
 import { GitHubIcon, LinkedInIcon, XIcon } from "@/components/icons";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description: `Get in touch with Sajal Kumar Mishra — Senior Software Developer available for freelance projects and full-time opportunities.`,
+  alternates: { canonical: "/contact/" },
+  openGraph: {
+    title: "Contact — Sajal Mishra",
+    description: `Get in touch with Sajal Kumar Mishra — Senior Software Developer available for freelance projects and full-time opportunities.`,
+    url: `${siteConfig.url}/contact/`,
+  },
+};
 
 export default function ContactPage() {
   return (

@@ -1,5 +1,18 @@
+import type { Metadata } from "next";
 import { BlogCard } from "@/components/sections/BlogCard";
 import { getAllPosts } from "@/lib/mdx";
+import { siteConfig } from "@/config/site";
+
+export const metadata: Metadata = {
+  title: "Blog",
+  description: "Thoughts on software development, tools, and things Sajal Kumar Mishra is building.",
+  alternates: { canonical: "/blog/" },
+  openGraph: {
+    title: "Blog — Sajal Mishra",
+    description: "Thoughts on software development, tools, and things Sajal Kumar Mishra is building.",
+    url: `${siteConfig.url}/blog/`,
+  },
+};
 
 export default function BlogPage() {
   const posts = getAllPosts();
