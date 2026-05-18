@@ -1,0 +1,181 @@
+---
+title: "Event-Driven Architecture in Production: Patterns and Tradeoffs"
+date: "2026-04-10"
+description: "How event-driven systems differ from request-response, when to use them, and the production lessons learned building payment and notification pipelines."
+tags: ["architecture", "events", "distributed-systems", "node.js"]
+---
+
+The first time I built a payment flow, it was a synchronous chain: validate → charge → create order → issue certificate → send email → return success. Seven steps in a single API call. It worked until it didn't — a transient email service timeout would fail the entire transaction, and the user would get charged but receive no confirmation.
+
+Event-driven architecture is what untangles this. This post covers the core model, the tradeoffs, and the patterns that actually work in production Node.js systems.
+
+## The Core Idea
+
+In a request-response architecture, services call each other directly. Service A knows about Service B and waits for a response before proceeding.
+
+In an event-driven architecture, services produce and consume events. Service A publishes "payment succeeded" and moves on. Service B (email), Service C (certificates), and Service D (analytics) each independently react to that event at their own pace.
+
+The producer doesn't know or care about the consumers. The consumers don't know about each other. This decoupling is the entire point.
+
+## When to Use Event-Driven
+
+Not everything should be event-driven. The tradeoffs are real.
+
+**Use events when:**
+- The triggering operation should not wait for downstream processing (sending an email shouldn't block a payment response)
+- Multiple independent systems need to react to the same state change
+- You want consumers to be independently deployable and scalable
+- Downstream processing can tolerate some delay (eventual consistency is acceptable)
+
+**Stick with request-response when:**
+- You need an immediate response from the downstream system before continuing
+- The operation must be atomic (either everything happens or nothing does)
+- The consuming system is synchronous and you control both ends
+- Simplicity matters more than scale at this point in the project
+
+## A Real Example: Payment Pipeline
+
+Before the event-driven rewrite at Rigi, a successful payment would trigger this synchronous chain in a single transaction:
+
+```
+POST /purchase
+  → validate coupon
+  → create Razorpay order
+  → [webhook: payment success]
+     → update order status
+     → send confirmation email
+     → issue certificate (if applicable)
+     → credit affiliate
+     → emit analytics event
+     → return 200
+```
+
+Any failure in any downstream step required manual recovery. The Razorpay webhook had a 30-second timeout — if our handler took too long (e.g., certificate PDF generation was slow), Razorpay would retry, causing duplicate processing.
+
+The rewrite separated concerns into independent consumers:
+
+```
+POST /purchase → create order → return payment URL
+
+Razorpay webhook
+  → update order status (synchronous, within 200ms)
+  → publish "payment.completed" event
+
+Consumers (each independent):
+  → email-service: send confirmation
+  → certificate-service: generate and deliver certificate
+  → affiliate-service: credit referrer
+  → analytics-service: record conversion
+```
+
+The webhook handler now does one thing: acknowledge the payment and publish an event. It returns within the timeout window every time.
+
+## Idempotency: The Most Important Property
+
+Event systems deliver messages at-least-once. Network failures, service restarts, and redelivery mechanisms mean your consumers will process the same event more than once.
+
+Every consumer must be idempotent — processing the same event twice should produce the same result as processing it once.
+
+For the certificate service, idempotency means checking whether a certificate already exists before generating one:
+
+```typescript
+async function handlePaymentCompleted(event: PaymentCompletedEvent) {
+  const existing = await db.certificates.findOne({
+    orderId: event.orderId,
+  });
+
+  if (existing) return; // already processed, skip
+
+  await issueCertificate(event.userId, event.orderId);
+}
+```
+
+For the analytics service, idempotency means using the event ID as a deduplication key:
+
+```typescript
+async function handlePaymentCompleted(event: PaymentCompletedEvent) {
+  const inserted = await db.analyticsEvents.upsert(
+    { eventId: event.id },
+    { userId: event.userId, amount: event.amount, timestamp: event.timestamp },
+    { onConflict: "ignore" }
+  );
+}
+```
+
+If you can't make an operation naturally idempotent, store processed event IDs and skip duplicates explicitly.
+
+## Failure Handling: Dead Letter Queues
+
+Consumers fail. The network goes down, a dependency is unavailable, a bug in the handler throws an unhandled exception.
+
+You need a way to handle messages that keep failing without blocking the healthy messages behind them. This is what a Dead Letter Queue (DLQ) is for.
+
+The pattern:
+
+1. Consumer processes a message
+2. If it fails, retry up to N times (with exponential backoff)
+3. After N failures, move the message to a DLQ
+4. Alert on DLQ depth — these are messages that need human attention
+
+```typescript
+async function processWithRetry(message: Message, handler: Handler) {
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      await handler(message);
+      return;
+    } catch (err) {
+      attempt++;
+      if (attempt === maxRetries) {
+        await dlq.push(message);
+        logger.error({ message, err }, "Message sent to DLQ after max retries");
+        return;
+      }
+      await sleep(Math.pow(2, attempt) * 100); // 200ms, 400ms, 800ms
+    }
+  }
+}
+```
+
+Monitor DLQ depth as a key operational metric. Messages in the DLQ are revenue at risk.
+
+## Ordering and Consistency
+
+Event-driven systems trade ordering guarantees for scalability. If you have multiple consumers processing events concurrently, you can't guarantee that events are processed in the order they were produced.
+
+For most side-effect systems (email, analytics, notifications), this is fine. For operations where ordering matters — like updating account balance — you need to either:
+
+1. Route events for the same entity to the same consumer instance (partition by user ID or account ID)
+2. Use optimistic locking in the consumer: only apply the event if the current version matches the expected version
+3. Accept that the operation requires stronger consistency guarantees and keep it synchronous
+
+## Observability in Event Systems
+
+Debugging a synchronous system is straightforward — follow the call stack. In an event-driven system, a single user action might trigger events processed by five different services over several seconds.
+
+Two things make this tractable:
+
+**Correlation IDs.** Pass a trace ID from the original request through every event it generates. Every log line from every consumer that handles a downstream event includes this ID. Now you can grep for one ID and reconstruct the full causal chain.
+
+```typescript
+// When publishing an event, include the trace ID
+await eventBus.publish("payment.completed", {
+  ...paymentData,
+  traceId: req.headers["x-trace-id"] ?? generateId(),
+});
+
+// In every consumer
+logger.info({ traceId: event.traceId, eventType: "payment.completed" }, "Processing event");
+```
+
+**Event schema versioning.** Events are contracts between services. When a producer changes an event's shape, consumers break silently if they're not updated. Version your events (`v1.payment.completed`, `v2.payment.completed`) and maintain compatibility windows. Adding fields is fine; removing or renaming them is a breaking change.
+
+## The Operational Reality
+
+Event-driven systems are more complex to operate than synchronous ones. You trade one kind of failure (synchronous errors with clear stack traces) for another (silent failures, ordering issues, duplicate processing, DLQ buildup).
+
+The tradeoff is usually worth it when you have multiple independent consumers, when reliability matters more than simplicity, or when you need services to scale independently. It's often not worth it for internal service communication where you control both sides and latency matters.
+
+Start with the simplest thing that works. Introduce events where the synchronous chain is causing reliability problems — not as an architectural preference.

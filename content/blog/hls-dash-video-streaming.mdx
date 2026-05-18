@@ -1,0 +1,160 @@
+---
+title: "HLS and DASH Video Streaming: How Adaptive Bitrate Delivery Works"
+date: "2026-05-12"
+description: "A deep dive into video streaming infrastructure — HLS manifest generation, DASH segmentation, multi-language subtitles, and CDN delivery patterns."
+tags: ["streaming", "infrastructure", "node.js", "aws"]
+---
+
+When I built the video streaming infrastructure at Rigi, the goal was simple on the surface: users upload a video, learners watch it. The reality underneath involved encoding pipelines, manifest files, CDN cache invalidation, and subtitle injection across multiple languages.
+
+This post covers the engineering behind adaptive bitrate streaming — what HLS and DASH actually are, how the encoding pipeline works, and the lessons I learned shipping it to production.
+
+## What Adaptive Bitrate Streaming Solves
+
+A user on a 4G connection and a user on fibre should both be able to watch the same video. If you serve a single 1080p MP4, the 4G user buffers constantly. If you serve a single 480p MP4, the fibre user gets a degraded experience.
+
+Adaptive bitrate streaming (ABR) solves this by:
+
+1. Encoding the video at multiple quality levels (bitrates)
+2. Splitting each level into small segments (typically 2–6 seconds each)
+3. Serving a manifest file that tells the player which segments exist at which quality
+4. Letting the player pick segments dynamically based on available bandwidth
+
+The two dominant protocols are **HLS** (HTTP Live Streaming, developed by Apple) and **MPEG-DASH** (Dynamic Adaptive Streaming over HTTP, an open standard). Both follow the same conceptual model but use different manifest formats.
+
+## HLS: M3U8 Manifests
+
+HLS uses `.m3u8` files — plain text playlists. There are two types:
+
+**Master playlist** — lists all available quality levels:
+
+```
+#EXTM3U
+#EXT-X-VERSION:3
+
+#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360
+360p/index.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=1280x720
+720p/index.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1920x1080
+1080p/index.m3u8
+```
+
+**Media playlist** — lists the actual segments for one quality level:
+
+```
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:6
+#EXT-X-MEDIA-SEQUENCE:0
+
+#EXTINF:6.006,
+seg000.ts
+#EXTINF:6.006,
+seg001.ts
+#EXTINF:5.880,
+seg002.ts
+#EXT-X-ENDLIST
+```
+
+The player fetches the master playlist, reads available bitrates, and then requests segments from the appropriate media playlist based on current network conditions.
+
+## DASH: MPD Manifests
+
+MPEG-DASH uses XML-based `.mpd` (Media Presentation Description) files. They carry more metadata than M3U8 and support richer features like multiple audio tracks out of the box.
+
+```xml
+<MPD type="static" mediaPresentationDuration="PT2M30S">
+  <Period>
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="360p" bandwidth="800000" width="640" height="360">
+        <SegmentTemplate media="360p_$Number$.m4s" initialization="360p_init.mp4"
+          startNumber="0" duration="6000" timescale="1000"/>
+      </Representation>
+      <Representation id="720p" bandwidth="1400000" width="1280" height="720">
+        <SegmentTemplate media="720p_$Number$.m4s" initialization="720p_init.mp4"
+          startNumber="0" duration="6000" timescale="1000"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
+```
+
+In the Rigi platform, we served both formats. Most mobile players prefer HLS; many web-based players handle DASH better.
+
+## The Encoding Pipeline
+
+The pipeline for a single video upload looks like this:
+
+1. **Upload** — creator uploads the raw video via a presigned S3 URL. The API receives the S3 key and enqueues an encoding job.
+2. **Transcoding** — a worker pulls the job, downloads the raw file, and runs FFmpeg to produce multiple renditions:
+
+```bash
+# 360p rendition
+ffmpeg -i input.mp4 \
+  -vf scale=640:360 \
+  -c:v libx264 -b:v 800k \
+  -c:a aac -b:a 128k \
+  -hls_time 6 \
+  -hls_playlist_type vod \
+  -hls_segment_filename "360p/seg%03d.ts" \
+  360p/index.m3u8
+
+# 720p rendition
+ffmpeg -i input.mp4 \
+  -vf scale=1280:720 \
+  -c:v libx264 -b:v 1400k \
+  -c:a aac -b:a 128k \
+  -hls_time 6 \
+  -hls_playlist_type vod \
+  -hls_segment_filename "720p/seg%03d.ts" \
+  720p/index.m3u8
+```
+
+3. **Manifest generation** — once all renditions are encoded, the master playlist is assembled and written to S3.
+4. **CDN propagation** — the segments and manifests are stored in S3. CloudFront sits in front with long cache TTLs on `.ts`/`.m4s` segments (immutable) and shorter TTLs on `.m3u8`/`.mpd` (occasionally updated for live streams).
+
+## Multi-Language Subtitles
+
+HLS supports WebVTT subtitle tracks natively. Each language is a separate `.vtt` file, and the master playlist references them:
+
+```
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="en",
+  NAME="English",DEFAULT=YES,URI="subs/en.m3u8"
+
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="hi",
+  NAME="Hindi",DEFAULT=NO,URI="subs/hi.m3u8"
+```
+
+The subtitle m3u8 then points to `.vtt` segment files for each language. We stored all subtitle tracks alongside the video segments in S3.
+
+## The Problem That Caused 98% of Playback Errors
+
+Before the infrastructure rewrite, the platform served raw MP4 files. The playback error rate was high for one main reason: **range request handling**.
+
+Video players don't download the entire MP4 — they issue HTTP range requests to seek to specific positions. When those requests hit an origin that didn't handle `Range` headers correctly (or when the CDN wasn't configured to cache range requests properly), the player would stall or error.
+
+Switching to HLS/DASH eliminated the range request problem entirely. Players now request discrete segments — each is a complete, self-contained HTTP response. No range headers needed.
+
+## CDN Configuration for Streaming
+
+Two important CloudFront settings for streaming:
+
+**Cache based on query strings** — if your segments have query string signatures (for protected content), configure CloudFront to cache based on those strings, or strip them at the origin.
+
+**Cache TTLs:**
+- `.ts` / `.m4s` segments: 1 year (immutable — segment files never change after encoding)
+- Master `.m3u8` / `.mpd`: 30 seconds to 5 minutes (short, to allow manifest updates for live content)
+- WebVTT / subtitle files: 1 year (immutable)
+
+## What I'd Do Differently
+
+The encoding pipeline ran on a single worker pool. Under load, encoding jobs queued up and creators saw long waits before their video was available. A more robust architecture would:
+
+1. Use a dedicated transcoding service (AWS MediaConvert or a self-managed fleet) rather than ad-hoc workers
+2. Process renditions in parallel rather than sequentially
+3. Emit events when encoding completes so the platform can update content state immediately
+
+The manifest-based architecture itself was the right call — it's what made the system stable at scale.

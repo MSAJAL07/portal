@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Hero } from "@/components/sections/Hero";
 import { About } from "@/components/sections/About";
 import { Experience } from "@/components/sections/Experience";
+import { Systems } from "@/components/sections/Systems";
 import { Skills } from "@/components/sections/Skills";
 import { ProjectCard } from "@/components/sections/ProjectCard";
 import { Separator } from "@/components/ui/separator";
@@ -29,6 +30,8 @@ export default function Home() {
       <About />
       <Separator className="opacity-30" />
       <Experience />
+      <Separator className="opacity-30" />
+      <Systems />
       <Separator className="opacity-30" />
       <Skills />
       <Separator className="opacity-30" />

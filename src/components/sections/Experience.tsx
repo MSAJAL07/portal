@@ -36,17 +36,17 @@ const experiences: ExperienceItem[] = [
         title: "Senior Software Developer",
         period: "Oct 2023 – Mar 2025 · 1 yr 6 mos",
         bullets: [
-          "Architected the LMS platform's core services — cohort management, drip-content delivery, parallel video upload pipelines, and lesson ordering — enabling 500+ cohort launches by creators.",
-          "Built the certificate issuance system, installment payment logic, and affiliate reward engine powering the creator monetisation layer for 1M+ users.",
-          "Designed and integrated a video streaming infrastructure using MPD and M3U8 manifest formats, with multi-language subtitle support and dynamic bitrate selection, reducing playback errors by 98%.",
-          "Developed cohort purchase flows and the content access platform (progress tracking, quizzes, assignments, commenting), serving 50+ edtech creators including GrowDataSkills, AlgoPrep, and PowerOfStocks.",
+          "Architected the LMS platform's core services — cohort management, drip-content delivery, parallel video upload pipelines, and lesson ordering — enabling %%500+ cohort launches%% by creators.",
+          "Built the certificate issuance system, installment payment logic, and affiliate reward engine powering the creator monetisation layer for %%1M+ users%%.",
+          "Designed and integrated a video streaming infrastructure using MPD and M3U8 manifest formats, with multi-language subtitle support and dynamic bitrate selection, reducing playback errors by %%98%%.",
+          "Developed cohort purchase flows and the content access platform (progress tracking, quizzes, assignments, commenting), serving %%50+ edtech creators%% including GrowDataSkills, AlgoPrep, and PowerOfStocks.",
         ],
       },
       {
         title: "Software Developer",
         period: "Feb 2023 – Oct 2023 · 9 mos",
         bullets: [
-          "Built GapUp from scratch — a platform for SEBI-registered advisors covering service discovery, advisory purchases, and referral tracking — driving a 50%+ revenue increase.",
+          "Built GapUp from scratch — a platform for SEBI-registered advisors covering service discovery, advisory purchases, and referral tracking — driving a %%50%+ revenue increase%%.",
           "Extended the coupon service to support platform-level discounts, reworked payment logic to handle platform cuts across all offerings, and implemented an affiliate tracking system for GapUp.",
           "Integrated Razorpay for payment processing, Amplitude for event instrumentation, and built the referral and acquisition pipeline end to end.",
         ],
@@ -83,6 +83,23 @@ const experiences: ExperienceItem[] = [
     ],
   },
 ];
+
+function BulletText({ text }: { text: string }) {
+  const parts = text.split(/%%([^%]+)%%/);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className="text-cyan-400 font-semibold font-mono">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
 
 export function Experience() {
   return (
@@ -130,7 +147,9 @@ export function Experience() {
                       {role.bullets.map((bullet, k) => (
                         <li key={k} className="text-sm text-muted-foreground flex gap-2">
                           <span className="text-cyan-500 mt-1.5 shrink-0">▹</span>
-                          <span>{bullet}</span>
+                          <span>
+                            <BulletText text={bullet} />
+                          </span>
                         </li>
                       ))}
                     </ul>

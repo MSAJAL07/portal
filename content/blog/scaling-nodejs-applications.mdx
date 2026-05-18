@@ -1,0 +1,194 @@
+---
+title: "Scaling Node.js Applications with Redis: Caching, Queues, and Pub/Sub"
+date: "2026-04-28"
+description: "Practical patterns for scaling Node.js services — Redis for caching, job queues, and pub/sub for event-driven communication between services."
+tags: ["node.js", "redis", "scaling", "distributed-systems"]
+---
+
+Node.js handles I/O well but hits limits fast when you start adding database load, background jobs, and inter-service communication. Redis tends to be the thing that solves all three — but how you use it matters a lot.
+
+This post covers the Redis patterns I've relied on in production: caching strategies, job queue design, and pub/sub for lightweight service coordination.
+
+## Why Redis Is Usually the Answer
+
+Redis is an in-memory data structure store. The reason it solves so many different scaling problems is that it's both **fast** (sub-millisecond for most operations) and **versatile** — it's not just a key-value store. It has native support for lists, sets, sorted sets, hashes, streams, and pub/sub channels.
+
+The mistake I've seen teams make is using Redis only as a cache. That leaves significant capacity on the table.
+
+## Caching Patterns
+
+### Cache-Aside (Lazy Loading)
+
+The most common pattern. The application checks Redis first; if the data isn't there, it fetches from the database and writes to the cache.
+
+```typescript
+async function getCohort(cohortId: string): Promise<Cohort> {
+  const key = `cohort:${cohortId}`;
+  const cached = await redis.get(key);
+  if (cached) return JSON.parse(cached);
+
+  const cohort = await db.cohorts.findById(cohortId);
+  await redis.setex(key, 300, JSON.stringify(cohort)); // 5-minute TTL
+  return cohort;
+}
+```
+
+**When to use:** Read-heavy data that doesn't change frequently. Course metadata, user profiles, pricing tiers.
+
+**Gotcha:** Cache stampede. If 1000 requests arrive when a cache entry expires, they all hit the database simultaneously. Fix this with a short lock:
+
+```typescript
+async function getCohortWithLock(cohortId: string): Promise<Cohort> {
+  const key = `cohort:${cohortId}`;
+  const lockKey = `lock:cohort:${cohortId}`;
+  
+  const cached = await redis.get(key);
+  if (cached) return JSON.parse(cached);
+
+  const acquired = await redis.set(lockKey, "1", "EX", 5, "NX");
+  if (!acquired) {
+    await sleep(50);
+    return getCohortWithLock(cohortId); // retry
+  }
+
+  const cohort = await db.cohorts.findById(cohortId);
+  await redis.setex(key, 300, JSON.stringify(cohort));
+  await redis.del(lockKey);
+  return cohort;
+}
+```
+
+### Write-Through
+
+Write to Redis and the database simultaneously. Reads always come from Redis. Use this for data that's written infrequently but read constantly — like a user's subscription status.
+
+```typescript
+async function updateSubscription(userId: string, plan: string) {
+  await Promise.all([
+    db.users.update({ id: userId }, { plan }),
+    redis.hset(`user:${userId}`, "plan", plan),
+  ]);
+}
+```
+
+### Cache Invalidation
+
+The hardest part. For entity-level caching, invalidate on write:
+
+```typescript
+async function updateCohort(cohortId: string, data: Partial<Cohort>) {
+  await db.cohorts.update({ id: cohortId }, data);
+  await redis.del(`cohort:${cohortId}`);
+}
+```
+
+For more complex invalidation (e.g., invalidating all entries related to a course), use a tag-based strategy with sets — store keys by tag, then invalidate the whole tag at once.
+
+## Job Queues
+
+Node.js is single-threaded. Long-running work (encoding, PDF generation, email sending) should never happen in the request lifecycle. Redis lists are the foundation for most Node.js job queue libraries.
+
+The core model is simple:
+
+- **Producer** pushes a job to a Redis list: `LPUSH queue:jobs <payload>`
+- **Worker** blocks waiting for a job: `BRPOP queue:jobs 0`
+- Worker processes the job and optionally pushes a result or triggers another job
+
+### Reliability: At-Least-Once Delivery
+
+`BRPOP` atomically pops the job from the queue. If the worker crashes after popping but before completing, the job is lost. To prevent this, use the "reliable queue" pattern with a processing list:
+
+```
+BRPOPLPUSH queue:jobs queue:processing 0
+```
+
+This atomically moves the job from the main queue to a processing list. A separate watchdog periodically checks `queue:processing` for jobs that have been there too long (worker crashed) and requeues them.
+
+This is exactly what BullMQ does under the hood — it's worth understanding the primitive before reaching for the library.
+
+### Job State Tracking
+
+For jobs users care about (like video encoding), store progress in a Redis hash:
+
+```typescript
+await redis.hset(`job:${jobId}`, {
+  status: "processing",
+  progress: 45,
+  startedAt: Date.now(),
+});
+```
+
+Poll this from the frontend, or push updates via WebSocket.
+
+## Pub/Sub for Service Coordination
+
+Redis pub/sub is a fire-and-forget messaging system. It's useful for lightweight coordination between services when you don't need delivery guarantees.
+
+Typical use: when a payment succeeds, publish an event. Multiple subscribers (certificate service, email service, analytics) all receive it independently.
+
+```typescript
+// publisher (payment service)
+await redis.publish("payment.completed", JSON.stringify({
+  userId,
+  amount,
+  orderId,
+  timestamp: Date.now(),
+}));
+```
+
+```typescript
+// subscriber (certificate service)
+const subscriber = redis.duplicate();
+await subscriber.subscribe("payment.completed");
+
+subscriber.on("message", async (channel, message) => {
+  const event = JSON.parse(message);
+  await issueCertificate(event.userId, event.orderId);
+});
+```
+
+**Important limitations:**
+- Messages are only delivered to currently-connected subscribers. If the certificate service is down when the event fires, it misses it.
+- No message persistence, no replay, no consumer groups.
+
+For anything that requires reliability, use Redis Streams (`XADD` / `XREADGROUP`) instead — they behave more like Kafka, with persistent log and consumer group semantics.
+
+## Connection Management
+
+A mistake I made early: creating a new Redis connection per request. Each connection uses memory on the Redis server and adds latency.
+
+Use a single shared client per Node.js process:
+
+```typescript
+// redis.ts
+import { createClient } from "redis";
+
+const redis = createClient({ url: process.env.REDIS_URL });
+redis.on("error", (err) => console.error("Redis error:", err));
+await redis.connect();
+
+export { redis };
+```
+
+For operations that need a dedicated connection (pub/sub subscribers, blocking commands like `BRPOP`), duplicate the client:
+
+```typescript
+const subscriber = redis.duplicate();
+await subscriber.connect();
+```
+
+## Eviction and Memory
+
+Redis runs in memory. When it fills up, it evicts keys based on the configured policy (`allkeys-lru` is usually right for a cache). Set a `maxmemory` limit and pick an eviction policy that matches your access patterns.
+
+For data that must never be evicted (queued jobs, session tokens), use Redis persistence (`AOF` or `RDB`) and avoid mixing it with pure cache usage on the same instance. Keep cache data and durable data on separate Redis instances if you can.
+
+## What I Reach For First
+
+- **Cache-aside with TTLs** — for any database query that runs more than once per second
+- **BRPOPLPUSH reliable queue** — for background jobs where loss is unacceptable
+- **Pub/sub** — for lightweight events where at-most-once delivery is fine
+- **Redis Streams** — when I need pub/sub but with durability and consumer group semantics
+- **Sorted sets** — for rate limiting (sliding window counters), leaderboards, or any time-ordered data
+
+Redis is one of the few technologies that gets more useful the deeper you go into it.

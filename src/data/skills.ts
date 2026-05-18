@@ -6,11 +6,11 @@ export interface SkillCategory {
 
 export const skillCategories: SkillCategory[] = [
   {
-    category: "APIs & Services",
+    category: "Backend & APIs",
     skills: ["Node.js", "Express.js", "gRPC", "REST APIs", "Redis"],
   },
   {
-    category: "Frontend",
+    category: "Frontend Systems",
     skills: ["React.js", "Next.js", "Redux", "Tailwind CSS"],
   },
   {
@@ -23,7 +23,11 @@ export const skillCategories: SkillCategory[] = [
   },
   {
     category: "Infrastructure & Cloud",
-    skills: ["Docker", "AWS", "GitHub Actions", "Prometheus", "Grafana"],
+    skills: ["Docker", "AWS", "GitHub Actions"],
+  },
+  {
+    category: "Observability",
+    skills: ["Prometheus", "Grafana"],
   },
   {
     category: "Currently Exploring",

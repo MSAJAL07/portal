@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Mail, ArrowRight } from "lucide-react";
+import { Mail, ArrowRight, Download } from "lucide-react";
 import { GitHubIcon, LinkedInIcon, XIcon } from "@/components/icons";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export function Hero() {
             </motion.p>
 
             <motion.h1
-              className="text-4xl sm:text-6xl font-bold tracking-tight mb-4"
+              className="text-4xl sm:text-6xl font-bold tracking-tight mb-3"
               variants={fadeUp}
               initial="initial"
               animate="animate"
@@ -41,6 +41,16 @@ export function Hero() {
             >
               Sajal Mishra.
             </motion.h1>
+
+            <motion.p
+              className="font-mono text-xs text-muted-foreground tracking-widest uppercase mb-4"
+              variants={fadeUp}
+              initial="initial"
+              animate="animate"
+              transition={{ duration: 0.4, delay: 0.15 }}
+            >
+              Backend Engineer · APIs · Distributed Systems
+            </motion.p>
 
             <motion.p
               className="text-xl sm:text-2xl text-muted-foreground mb-8 leading-relaxed"
@@ -63,6 +73,13 @@ export function Hero() {
               <Link href="/projects" className={cn(buttonVariants())}>
                 View Projects <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
+              <a
+                href="/resume.pdf"
+                download
+                className={cn(buttonVariants({ variant: "outline" }))}
+              >
+                Resume <Download className="ml-2 h-4 w-4" />
+              </a>
               <Link href="/contact" className={cn(buttonVariants({ variant: "outline" }))}>
                 Get in touch
               </Link>
