@@ -20,7 +20,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 flex h-14 items-center justify-between">
         <Link href="/" className="font-mono text-sm font-semibold text-cyan-500 hover:text-cyan-400 transition-colors">
           SK
