@@ -19,21 +19,22 @@ export function About() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2 space-y-4 text-muted-foreground leading-relaxed">
               <p>
-                I&apos;m a full-stack software developer with 4+ years of experience building
-                production-grade web applications. Currently working at{" "}
-                <span className="text-foreground font-medium">Veramatic</span> on scalable automation
-                workflows for dealership accounting processes.
+                I&apos;m a software developer with 4+ years of experience designing and building
+                production-grade APIs, distributed systems, and full-stack web applications. Currently at{" "}
+                <span className="text-foreground font-medium">Veramatic</span>, architecting automation
+                workflows that handle complex data onboarding for dealership accounting processes.
               </p>
               <p>
-                Previously at <span className="text-foreground font-medium">Rigi</span>, I led the
-                development of a comprehensive LMS platform adopted by 50+ edtech creators and serving
-                1M+ learners, and built GapUp &mdash; a platform for SEBI-registered advisors that drove
-                a 50%+ revenue increase.
+                At <span className="text-foreground font-medium">Rigi</span>, I led platform engineering
+                for an LMS serving 1M+ learners &mdash; building payment pipelines, certificate issuance
+                systems, coupon services, and a video streaming infrastructure with custom player
+                integration. I also built GapUp, a financial advisory platform that drove a 50%+ revenue
+                increase.
               </p>
               <p>
-                I enjoy working across the stack: designing clean APIs, building performant React UIs,
-                and thinking through system design. Outside of web development, I&apos;ve built things
-                in C++ ranging from a MongoDB driver wrapper to a web framework from scratch.
+                I care about how things work under the hood. Outside of web development, I&apos;ve built
+                a C++ MongoDB driver wrapper and an HTTP web framework from scratch &mdash; which keeps
+                my understanding of networking, memory management, and system design grounded.
               </p>
             </div>
 

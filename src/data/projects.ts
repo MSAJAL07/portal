@@ -13,7 +13,7 @@ export const projects: Project[] = [
     id: "cpp-mongodb-library",
     title: "C++ MongoDB Library",
     description:
-      "A C++ wrapper library for performing CRUD operations on MongoDB using the MongoDB C Driver. Simplifies database interactions in C++ applications with a clean, object-oriented API.",
+      "A C++ wrapper over the MongoDB C Driver, providing a clean object-oriented API for database operations. Handles connection management, CRUD operations, and error propagation in a header-friendly interface.",
     tags: ["C++", "MongoDB", "Library"],
     githubUrl: "https://github.com/MSAJAL07/cpp-library-for-mongodb",
   },
@@ -29,7 +29,7 @@ export const projects: Project[] = [
     id: "web-framework-cpp",
     title: "Web Application Framework (C++)",
     description:
-      "A C++ web server built from scratch, capable of serving dynamic web applications. Demonstrates low-level networking and HTTP request handling.",
+      "An HTTP/1.1 application framework built from scratch in C++. Implements raw TCP socket handling, request parsing, URL routing, and response generation with zero external dependencies.",
     tags: ["C++", "Web Server", "Networking"],
     githubUrl: "https://github.com/MSAJAL07/Web-applications-framework-in-CPP",
   },
@@ -45,7 +45,7 @@ export const projects: Project[] = [
     id: "smart-attendance",
     title: "Smart Attendance Recognizer",
     description:
-      "React frontend for an AI-powered attendance recognition system. Handles user interface for capturing, submitting, and tracking attendance records.",
+      "React application for an AI-powered attendance system. Communicates with a recognition API in real time, manages session state, and renders live attendance records.",
     tags: ["React", "JavaScript", "AI/ML"],
     githubUrl: "https://github.com/MSAJAL07/smart-attendance-recognizer-frontend",
   },

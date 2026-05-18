@@ -49,8 +49,8 @@ export function Hero() {
               animate="animate"
               transition={{ duration: 0.4, delay: 0.2 }}
             >
-              Senior Software Developer. I build scalable web products &mdash; from LMS platforms serving{" "}
-              <span className="text-foreground">1M+ users</span> to logistics dashboards that drive operational efficiency.
+              Senior Software Developer. I design and build scalable systems and APIs &mdash; from platforms serving{" "}
+              <span className="text-foreground">1M+ users</span> to automation workflows powering business-critical operations.
             </motion.p>
 
             <motion.div
