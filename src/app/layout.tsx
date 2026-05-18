@@ -51,7 +51,7 @@ export const metadata: Metadata = {
         url: "/avatar.jpg",
         width: 400,
         height: 400,
-        alt: "Sajal Kumar Mishra — Senior Software Developer",
+        alt: "Sajal Kumar Mishra — Senior Software Developer & Backend Engineer",
       },
     ],
   },
@@ -100,8 +100,10 @@ export default function RootLayout({
               jobTitle: "Senior Software Developer",
               description: siteConfig.description,
               knowsAbout: [
-                "JavaScript", "TypeScript", "React.js", "Next.js",
-                "Node.js", "Full Stack Development", "Software Engineering",
+                "Node.js", "TypeScript", "JavaScript", "REST APIs",
+                "gRPC", "Distributed Systems", "Redis", "Docker",
+                "PostgreSQL", "MongoDB", "React.js", "Next.js",
+                "Software Engineering", "System Design",
               ],
               worksFor: {
                 "@type": "Organization",
